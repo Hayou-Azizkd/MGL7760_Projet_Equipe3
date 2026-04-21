@@ -338,7 +338,7 @@ jobs:
             sudo docker run -d \
               --name anfis-app \
               --restart unless-stopped \
-              -p 8000:8000 \
+              -p 8808:8000 \
               ghcr.io/hayou-azizkd/mgl7760_projet_equipe3:develop
             sudo docker image prune -f
           "
