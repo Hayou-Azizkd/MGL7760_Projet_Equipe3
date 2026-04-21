@@ -45,6 +45,11 @@ jobs:
             set -e
             echo '${{ secrets.GITHUB_TOKEN }}' | sudo docker login ghcr.io -u '${{ github.actor }}' --password-stdin
             sudo docker pull ghcr.io/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
+            # Save current tag as previous before replacing
+            DEPLOY_FILE=~/.anfis_deploy_history
+            CURRENT=\$(cat \$DEPLOY_FILE 2>/dev/null | head -1 || echo '')
+            [ -n "\$CURRENT" ] && echo \"\$CURRENT\" > \${DEPLOY_FILE}.prev
+            echo '${{ github.event.inputs.image_tag }}' > \$DEPLOY_FILE
             sudo docker stop anfis-app 2>/dev/null || true
             sudo docker rm anfis-app 2>/dev/null || true
             sudo docker run -d \
@@ -63,6 +68,11 @@ jobs:
             set -e
             echo '${{ secrets.GITHUB_TOKEN }}' | sudo docker login ghcr.io -u '${{ github.actor }}' --password-stdin
             sudo docker pull ghcr.io/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
+            # Save current tag as previous before replacing
+            DEPLOY_FILE=~/.anfis_deploy_history
+            CURRENT=\$(cat \$DEPLOY_FILE 2>/dev/null | head -1 || echo '')
+            [ -n "\$CURRENT" ] && echo \"\$CURRENT\" > \${DEPLOY_FILE}.prev
+            echo '${{ github.event.inputs.image_tag }}' > \$DEPLOY_FILE
             sudo docker stop anfis-app 2>/dev/null || true
             sudo docker rm anfis-app 2>/dev/null || true
             sudo docker run -d \
