@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment to deploy to'
+        description: "Target environment to deploy to"
         required: true
         type: choice
         options:
           - staging
           - production
       image_tag:
-        description: 'Docker image tag to deploy (e.g. develop, main, sha-abc1234, v1.2.3)'
+        description: "Docker image tag to deploy (e.g. develop, main, sha-abc1234, v1.2.3)"
         required: true
         default: develop
 
