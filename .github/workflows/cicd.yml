@@ -332,14 +332,14 @@ jobs:
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
             set -e
             echo '${{ secrets.GITHUB_TOKEN }}' | sudo docker login ghcr.io -u '${{ github.actor }}' --password-stdin
-            sudo docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            sudo docker pull ghcr.io/hayou-azizkd/mgl7760_projet_equipe3:develop
             sudo docker stop anfis-app 2>/dev/null || true
             sudo docker rm anfis-app 2>/dev/null || true
             sudo docker run -d \
               --name anfis-app \
               --restart unless-stopped \
               -p 8000:8000 \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+              ghcr.io/hayou-azizkd/mgl7760_projet_equipe3:develop
             sudo docker image prune -f
           "
 
