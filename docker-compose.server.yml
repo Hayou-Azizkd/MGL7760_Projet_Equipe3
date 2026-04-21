@@ -1,0 +1,119 @@
+# Server-side docker-compose — pulls pre-built images, no local build required.
+# Usage:
+#   IMAGE_TAG=develop docker compose -f docker-compose.server.yml up -d
+# or copy .env.server → .env and run:
+#   docker compose -f docker-compose.server.yml up -d
+
+services:
+  dozzle:
+    container_name: dozzle
+    image: amir20/dozzle:latest
+    restart: unless-stopped
+    environment:
+      - DOZZLE_LEVEL=info
+      - DOZZLE_HOSTNAME=anfis-project
+      - DOZZLE_NO_ANALYTICS=true
+      - DOZZLE_TIMEOUT=30s
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - dozzle_data:/data
+    ports:
+      - "8880:8080"
+    healthcheck:
+      test: ["CMD", "/dozzle", "healthcheck"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - observability
+
+  anfis:
+    container_name: anfis-app
+    # Image is pulled from GHCR — no build needed on the server.
+    # Set IMAGE_TAG env var or override in .env (default: develop)
+    image: ghcr.io/hayou-azizkd/mgl7760_projet_equipe3:${IMAGE_TAG:-develop}
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=INFO
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLFLOW_EXPERIMENT_NAME=anfis-credit-risk
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    ports:
+      - "8808:8888"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    networks:
+      - observability
+
+  mlflow:
+    container_name: mlflow
+    image: ghcr.io/mlflow/mlflow:v2.22.0
+    restart: unless-stopped
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    ports:
+      - "5001:5000"
+    volumes:
+      - mlruns:/mlflow
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(''http://localhost:5000/health'').status==200 else 1)"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    networks:
+      - observability
+
+  cadvisor:
+    container_name: cadvisor
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - observability
+
+volumes:
+  dozzle_data:
+  mlruns:
+
+networks:
+  observability:
+    driver: bridge
