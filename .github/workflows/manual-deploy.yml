@@ -55,7 +55,7 @@ jobs:
             sudo docker run -d \
               --name anfis-app \
               --restart unless-stopped \
-              -p 8808:8000 \
+              -p 8808:8888 \
               ghcr.io/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
             sudo docker image prune -f
           "
@@ -78,7 +78,7 @@ jobs:
             sudo docker run -d \
               --name anfis-app \
               --restart unless-stopped \
-              -p 8808:8000 \
+              -p 8808:8888 \
               ghcr.io/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
             sudo docker image prune -f
           "
