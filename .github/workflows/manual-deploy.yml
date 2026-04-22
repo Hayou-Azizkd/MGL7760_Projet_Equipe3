@@ -87,9 +87,9 @@ jobs:
         if: always()
         run: |
           if [ "${{ job.status }}" = "success" ]; then
-            echo "## ✅ Deployment Succeeded" >> $GITHUB_STEP_SUMMARY
+            echo "##  Deployment Succeeded" >> $GITHUB_STEP_SUMMARY
           else
-            echo "## ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+            echo "##  Deployment Failed" >> $GITHUB_STEP_SUMMARY
           fi
           echo "**Environment:** \`${{ github.event.inputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY

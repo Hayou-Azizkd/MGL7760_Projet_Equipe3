@@ -40,7 +40,7 @@ jobs:
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
             "cat ~/.anfis_deploy_history.prev 2>/dev/null || echo ''")
           if [ -z "$PREV" ]; then
-            echo "❌ No previous deployment found on staging server." >&2
+            echo " No previous deployment found on staging server." >&2
             exit 1
           fi
           echo "ROLLBACK_TAG=$PREV" >> $GITHUB_ENV
@@ -53,7 +53,7 @@ jobs:
             ${{ secrets.DEPLOY_USER_PROD }}@${{ secrets.DEPLOY_HOST_PROD }} \
             "cat ~/.anfis_deploy_history.prev 2>/dev/null || echo ''")
           if [ -z "$PREV" ]; then
-            echo "❌ No previous deployment found on production server." >&2
+            echo " No previous deployment found on production server." >&2
             exit 1
           fi
           echo "ROLLBACK_TAG=$PREV" >> $GITHUB_ENV
@@ -109,9 +109,9 @@ jobs:
         if: always()
         run: |
           if [ "${{ job.status }}" = "success" ]; then
-            echo "## ✅ Rollback Succeeded" >> $GITHUB_STEP_SUMMARY
+            echo "##  Rollback Succeeded" >> $GITHUB_STEP_SUMMARY
           else
-            echo "## ❌ Rollback Failed" >> $GITHUB_STEP_SUMMARY
+            echo "##  Rollback Failed" >> $GITHUB_STEP_SUMMARY
           fi
           echo "**Environment:** \`${{ github.event.inputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Rolled back to:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.ROLLBACK_TAG }}\`" >> $GITHUB_STEP_SUMMARY
