@@ -1,0 +1,121 @@
+name: Rollback Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to rollback"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  rollback:
+    name: Rollback ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Set lowercase image name
+        run: echo "IMAGE_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Copy SSH key
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            echo "${{ secrets.DEPLOY_SSH_KEY }}" > key.pem
+          else
+            echo "${{ secrets.DEPLOY_SSH_KEY_PROD }}" > key.pem
+          fi
+          chmod 600 key.pem
+
+      - name: Resolve previous image tag (staging)
+        if: github.event.inputs.environment == 'staging'
+        run: |
+          PREV=$(ssh -o StrictHostKeyChecking=no -i key.pem \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "cat ~/.anfis_deploy_history.prev 2>/dev/null || echo ''")
+          if [ -z "$PREV" ]; then
+            echo " No previous deployment found on staging server." >&2
+            exit 1
+          fi
+          echo "ROLLBACK_TAG=$PREV" >> $GITHUB_ENV
+          echo "Rolling back staging to: $PREV"
+
+      - name: Resolve previous image tag (production)
+        if: github.event.inputs.environment == 'production'
+        run: |
+          PREV=$(ssh -o StrictHostKeyChecking=no -i key.pem \
+            ${{ secrets.DEPLOY_USER_PROD }}@${{ secrets.DEPLOY_HOST_PROD }} \
+            "cat ~/.anfis_deploy_history.prev 2>/dev/null || echo ''")
+          if [ -z "$PREV" ]; then
+            echo " No previous deployment found on production server." >&2
+            exit 1
+          fi
+          echo "ROLLBACK_TAG=$PREV" >> $GITHUB_ENV
+          echo "Rolling back production to: $PREV"
+
+      - name: Rollback on Staging
+        if: github.event.inputs.environment == 'staging'
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
+            set -e
+            echo '${{ secrets.GITHUB_TOKEN }}' | sudo docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+            sudo docker pull ghcr.io/${{ env.IMAGE_NAME }}:${{ env.ROLLBACK_TAG }}
+            # Swap history: current becomes prev, prev becomes current
+            DEPLOY_FILE=~/.anfis_deploy_history
+            CURRENT=\$(cat \$DEPLOY_FILE 2>/dev/null | head -1 || echo '')
+            echo '${{ env.ROLLBACK_TAG }}' > \$DEPLOY_FILE
+            [ -n \"\$CURRENT\" ] && echo \"\$CURRENT\" > \${DEPLOY_FILE}.prev
+            sudo docker stop anfis-app 2>/dev/null || true
+            sudo docker rm anfis-app 2>/dev/null || true
+            sudo docker run -d \
+              --name anfis-app \
+              --restart unless-stopped \
+              --network observability \
+              -p 8808:8888 \
+              ghcr.io/${{ env.IMAGE_NAME }}:${{ env.ROLLBACK_TAG }}
+            sudo docker image prune -f
+          "
+
+      - name: Rollback on Production
+        if: github.event.inputs.environment == 'production'
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem \
+            ${{ secrets.DEPLOY_USER_PROD }}@${{ secrets.DEPLOY_HOST_PROD }} "
+            set -e
+            echo '${{ secrets.GITHUB_TOKEN }}' | sudo docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+            sudo docker pull ghcr.io/${{ env.IMAGE_NAME }}:${{ env.ROLLBACK_TAG }}
+            # Swap history: current becomes prev, prev becomes current
+            DEPLOY_FILE=~/.anfis_deploy_history
+            CURRENT=\$(cat \$DEPLOY_FILE 2>/dev/null | head -1 || echo '')
+            echo '${{ env.ROLLBACK_TAG }}' > \$DEPLOY_FILE
+            [ -n \"\$CURRENT\" ] && echo \"\$CURRENT\" > \${DEPLOY_FILE}.prev
+            sudo docker stop anfis-app 2>/dev/null || true
+            sudo docker rm anfis-app 2>/dev/null || true
+            sudo docker run -d \
+              --name anfis-app \
+              --restart unless-stopped \
+              --network observability \
+              -p 8808:8888 \
+              ghcr.io/${{ env.IMAGE_NAME }}:${{ env.ROLLBACK_TAG }}
+            sudo docker image prune -f
+          "
+
+      - name: Rollback summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "##  Rollback Succeeded" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "##  Rollback Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "**Environment:** \`${{ github.event.inputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Rolled back to:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.ROLLBACK_TAG }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** \`${{ github.actor }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**At:** \`${{ github.run_id }}\`" >> $GITHUB_STEP_SUMMARY

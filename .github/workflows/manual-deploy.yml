@@ -1,0 +1,98 @@
+name: Manual Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment to deploy to"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      image_tag:
+        description: "Docker image tag to deploy (e.g. develop, main, sha-abc1234, v1.2.3)"
+        required: true
+        default: develop
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Set lowercase image name
+        run: echo "IMAGE_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Copy SSH key
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            echo "${{ secrets.DEPLOY_SSH_KEY }}" > key.pem
+          else
+            echo "${{ secrets.DEPLOY_SSH_KEY_PROD }}" > key.pem
+          fi
+          chmod 600 key.pem
+
+      - name: Deploy to Staging
+        if: github.event.inputs.environment == 'staging'
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
+            set -e
+            echo '${{ secrets.GITHUB_TOKEN }}' | sudo docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+            sudo docker pull ghcr.io/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
+            # Save current tag as previous before replacing
+            DEPLOY_FILE=~/.anfis_deploy_history
+            CURRENT=\$(cat \$DEPLOY_FILE 2>/dev/null | head -1 || echo '')
+            [ -n "\$CURRENT" ] && echo \"\$CURRENT\" > \${DEPLOY_FILE}.prev
+            echo '${{ github.event.inputs.image_tag }}' > \$DEPLOY_FILE
+            sudo docker stop anfis-app 2>/dev/null || true
+            sudo docker rm anfis-app 2>/dev/null || true
+            sudo docker run -d \
+              --name anfis-app \
+              --restart unless-stopped \
+              --network observability \
+              -p 8808:8888 \
+              ghcr.io/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
+            sudo docker image prune -f
+          "
+
+      - name: Deploy to Production
+        if: github.event.inputs.environment == 'production'
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem \
+            ${{ secrets.DEPLOY_USER_PROD }}@${{ secrets.DEPLOY_HOST_PROD }} "
+            set -e
+            echo '${{ secrets.GITHUB_TOKEN }}' | sudo docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+            sudo docker pull ghcr.io/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
+            # Save current tag as previous before replacing
+            DEPLOY_FILE=~/.anfis_deploy_history
+            CURRENT=\$(cat \$DEPLOY_FILE 2>/dev/null | head -1 || echo '')
+            [ -n "\$CURRENT" ] && echo \"\$CURRENT\" > \${DEPLOY_FILE}.prev
+            echo '${{ github.event.inputs.image_tag }}' > \$DEPLOY_FILE
+            sudo docker stop anfis-app 2>/dev/null || true
+            sudo docker rm anfis-app 2>/dev/null || true
+            sudo docker run -d \
+              --name anfis-app \
+              --restart unless-stopped \
+              --network observability \
+              -p 8808:8888 \
+              ghcr.io/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
+            sudo docker image prune -f
+          "
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "##  Deployment Succeeded" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "##  Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "**Environment:** \`${{ github.event.inputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
