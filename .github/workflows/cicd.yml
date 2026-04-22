@@ -314,7 +314,7 @@ jobs:
     name: Deploy to Staging Server
     runs-on: ubuntu-latest
     needs: [publish-container]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/hotfix/'))
     env:
       REGISTRY: ghcr.io
     steps:
