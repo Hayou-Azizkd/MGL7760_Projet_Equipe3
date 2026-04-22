@@ -72,13 +72,13 @@ jobs:
             CURRENT=\$(cat \$DEPLOY_FILE 2>/dev/null | head -1 || echo '')
             echo '${{ env.ROLLBACK_TAG }}' > \$DEPLOY_FILE
             [ -n \"\$CURRENT\" ] && echo \"\$CURRENT\" > \${DEPLOY_FILE}.prev
-            sudo docker network create observability 2>/dev/null || true
+            sudo docker network create anfiz_observability 2>/dev/null || true
             sudo docker stop anfis-app 2>/dev/null || true
             sudo docker rm anfis-app 2>/dev/null || true
             sudo docker run -d \
               --name anfis-app \
               --restart unless-stopped \
-              --network observability \
+              --network anfiz_observability \
               -p 8808:8888 \
               ghcr.io/${{ env.IMAGE_NAME }}:${{ env.ROLLBACK_TAG }}
             sudo docker image prune -f
@@ -97,13 +97,13 @@ jobs:
             CURRENT=\$(cat \$DEPLOY_FILE 2>/dev/null | head -1 || echo '')
             echo '${{ env.ROLLBACK_TAG }}' > \$DEPLOY_FILE
             [ -n \"\$CURRENT\" ] && echo \"\$CURRENT\" > \${DEPLOY_FILE}.prev
-            sudo docker network create observability 2>/dev/null || true
+            sudo docker network create anfiz_observability 2>/dev/null || true
             sudo docker stop anfis-app 2>/dev/null || true
             sudo docker rm anfis-app 2>/dev/null || true
             sudo docker run -d \
               --name anfis-app \
               --restart unless-stopped \
-              --network observability \
+              --network anfiz_observability \
               -p 8808:8888 \
               ghcr.io/${{ env.IMAGE_NAME }}:${{ env.ROLLBACK_TAG }}
             sudo docker image prune -f
