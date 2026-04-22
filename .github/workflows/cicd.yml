@@ -338,6 +338,7 @@ jobs:
             CURRENT=\$(cat \$DEPLOY_FILE 2>/dev/null | head -1 || echo '')
             [ -n \"\$CURRENT\" ] && echo \"\$CURRENT\" > \${DEPLOY_FILE}.prev
             echo 'develop' > \$DEPLOY_FILE
+            sudo docker network create observability 2>/dev/null || true
             sudo docker stop anfis-app 2>/dev/null || true
             sudo docker rm anfis-app 2>/dev/null || true
             sudo docker run -d \
