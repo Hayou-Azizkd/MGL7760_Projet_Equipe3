@@ -343,6 +343,7 @@ jobs:
             sudo docker run -d \
               --name anfis-app \
               --restart unless-stopped \
+              --network observability \
               -p 8808:8888 \
               ghcr.io/${{ env.IMAGE_NAME }}:develop
             sudo docker image prune -f
